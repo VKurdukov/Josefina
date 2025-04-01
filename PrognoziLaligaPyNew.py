@@ -508,3 +508,117 @@ def Coef_Max(a, b):
 
     # Возвращаем результаты
     return [Win1,draw,Win2]
+
+def NormalPrime(a, b, grade_1, grade_2, forma_1, forma_2):
+    a -= 1
+    b -= 1
+
+    if a >= len(scored) or b >= len(skipped) or a < 0 or b < 0:
+        raise ValueError(
+            f"Индексы команд a={a + 1} или b={b + 1} выходят за пределы доступных данных."
+        )
+
+    # Подгонка Пуассона для забитых и пропущенных голов команд a и b
+    scored_a = np.array([s[1] for s in scored[a]])
+    skipped_a = np.array([s[1] for s in skipped[a]])
+    scored_b = np.array([s[1] for s in scored[b]])
+    skipped_b = np.array([s[1] for s in skipped[b]])
+
+    # Находим параметры распределения для команд a и b
+    lambda1, _ = curve_fit(lambda x, lambd: poisson_func(x, lambd, matches_per_team[a]), num, scored_a, p0=[1])
+    lambda2, _ = curve_fit(lambda x, lambd: poisson_func(x, lambd, matches_per_team[a]), num, skipped_a, p0=[1])
+    lambda3, _ = curve_fit(lambda x, lambd: poisson_func(x, lambd, matches_per_team[b]), num, scored_b, p0=[1])
+    lambda4, _ = curve_fit(lambda x, lambd: poisson_func(x, lambd, matches_per_team[b]), num, skipped_b, p0=[1])
+
+    lambda1, lambda2, lambda3, lambda4 = (
+        lambda1[0],
+        lambda2[0],
+        lambda3[0],
+        lambda4[0],
+    )
+    Summa = lambda1 + lambda2 + lambda3 + lambda4
+    print(Summa, lambda1, lambda2, lambda3, lambda4)
+
+    # Initialize lambda_ variables with original values
+    lambda_1 = lambda1  # Default to original lambda1
+    lambda_2 = lambda2  # Default to original lambda2
+    lambda_3 = lambda3  # Default to original lambda3
+    lambda_4 = lambda4  # Default to original lambda4
+
+    # Adjust based on forma_1 and forma_2
+    n_forma = 5
+    if forma_1 > 0:
+        lambda_1 = lambda1 * (1 + forma_1 / n_forma)
+    elif forma_1 < 0:
+        lambda_2 = lambda2 * (1 - forma_1 / n_forma)
+
+    if forma_2 > 0:
+        lambda_3 = lambda3 * (1 + forma_2 / n_forma)
+    elif forma_2 < 0:
+        lambda_4 = lambda4 * (1 - forma_2 / n_forma)
+
+    Summa_forma = lambda_1 + lambda_2 + lambda_3 + lambda_4
+    print(Summa_forma, lambda_1, lambda_2, lambda_3, lambda_4)
+
+    # Scale lambdas to maintain the original sum
+    lambda1 = lambda_1 * Summa / Summa_forma
+    lambda2 = lambda_2 * Summa / Summa_forma
+    lambda3 = lambda_3 * Summa / Summa_forma
+    lambda4 = lambda_4 * Summa / Summa_forma
+    print(lambda1, lambda2, lambda3, lambda4)
+
+    # --- Определяем Pscore1 на основе grade_1 (атака A vs. защита B) ---
+    if grade_1 == 0:
+        Pscore1 = lambda x: poisson.pmf(x, min(lambda1, lambda4))
+    elif grade_1 == 1:
+        # Гармоническое среднее: 2/(1/a + 1/b)
+        Pscore1 = lambda x: poisson.pmf(
+            x, 2 * lambda1 * lambda4 / (lambda1 + lambda4)
+        )
+    elif grade_1 == 2:
+        # Геометрическое среднее: sqrt(a*b)
+        Pscore1 = lambda x: poisson.pmf(x, math.sqrt(lambda1 * lambda4))
+    elif grade_1 == 3:
+        # Арифметическое среднее: (a + b)/2
+        Pscore1 = lambda x: poisson.pmf(x, (lambda1 + lambda4) / 2)
+    elif grade_1 == 4:
+        # Квадратичное среднее: sqrt((a^2 + b^2)/2)
+        Pscore1 = lambda x: poisson.pmf(
+            x, math.sqrt((lambda1**2 + lambda4**2) / 2)
+        )
+    elif grade_1 == 5:
+        Pscore1 = lambda x: poisson.pmf(x, max(lambda1, lambda4))
+    else:
+        raise ValueError("Неверное значение grade_1 (0..5)")
+
+    # --- Определяем Pscore2 на основе grade_2 (атака B vs. защита A) ---
+    if grade_2 == 0:
+        Pscore2 = lambda x: poisson.pmf(x, min(lambda3, lambda2))
+    elif grade_2 == 1:
+        Pscore2 = lambda x: poisson.pmf(
+            x, 2 * lambda3 * lambda2 / (lambda3 + lambda2)
+        )
+    elif grade_2 == 2:
+        Pscore2 = lambda x: poisson.pmf(x, math.sqrt(lambda3 * lambda2))
+    elif grade_2 == 3:
+        Pscore2 = lambda x: poisson.pmf(x, (lambda3 + lambda2) / 2)
+    elif grade_2 == 4:
+        Pscore2 = lambda x: poisson.pmf(
+            x, math.sqrt((lambda3**2 + lambda2**2) / 2)
+        )
+    elif grade_2 == 5:
+        Pscore2 = lambda x: poisson.pmf(x, max(lambda3, lambda2))
+    else:
+        raise ValueError("Неверное значение grade_2 (0..5)")
+
+    # Вычисляем шансы на победу, ничью и количество голов
+    f1 = lambda n: np.sum([Pscore1(i) for i in range(n + 1)])
+    f2 = lambda n: np.sum([Pscore2(i) for i in range(n + 1)])
+
+    Win1 = float(np.sum([Pscore1(i) * f2(i - 1) for i in range(1, 11)]))
+    Win2 = float(np.sum([Pscore2(i) * f1(i - 1) for i in range(1, 11)]))
+    draw = float(np.sum([Pscore1(i) * Pscore2(i) for i in range(11)]))
+
+    TotalGoals = float(0.5 * (lambda1 + lambda2 + lambda3 + lambda4))
+
+    return Win1, draw, Win2,lambda1,lambda2,lambda3,lambda4,TotalGoals
