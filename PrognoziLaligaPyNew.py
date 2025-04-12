@@ -537,7 +537,7 @@ def NormalPrime(a, b, grade_1, grade_2, forma_1, forma_2):
         lambda4[0],
     )
     Summa = lambda1 + lambda2 + lambda3 + lambda4
-    print(Summa, lambda1, lambda2, lambda3, lambda4)
+    #print(Summa, lambda1, lambda2, lambda3, lambda4)
 
     # Initialize lambda_ variables with original values
     lambda_1 = lambda1  # Default to original lambda1
@@ -558,14 +558,14 @@ def NormalPrime(a, b, grade_1, grade_2, forma_1, forma_2):
         lambda_4 = lambda4 * (1 - forma_2 / n_forma)
 
     Summa_forma = lambda_1 + lambda_2 + lambda_3 + lambda_4
-    print(Summa_forma, lambda_1, lambda_2, lambda_3, lambda_4)
+    #print(Summa_forma, lambda_1, lambda_2, lambda_3, lambda_4)
 
     # Scale lambdas to maintain the original sum
     lambda1 = lambda_1 * Summa / Summa_forma
     lambda2 = lambda_2 * Summa / Summa_forma
     lambda3 = lambda_3 * Summa / Summa_forma
     lambda4 = lambda_4 * Summa / Summa_forma
-    print(lambda1, lambda2, lambda3, lambda4)
+    #print(lambda1, lambda2, lambda3, lambda4)
 
     # --- Определяем Pscore1 на основе grade_1 (атака A vs. защита B) ---
     if grade_1 == 0:
@@ -622,3 +622,211 @@ def NormalPrime(a, b, grade_1, grade_2, forma_1, forma_2):
     TotalGoals = float(0.5 * (lambda1 + lambda2 + lambda3 + lambda4))
 
     return Win1, draw, Win2,lambda1,lambda2,lambda3,lambda4,TotalGoals
+
+def Coef_Monte(a, b, n_simulations=100000):
+    # Приводим индексы к нулевой базе
+    a -= 1
+    b -= 1
+
+    # Проверка валидности индексов
+    if a >= len(scored) or b >= len(skipped) or a < 0 or b < 0:
+        raise ValueError(f"Invalid team indices: a={a+1} or b={b+1}")
+
+    # Извлекаем данные
+    scored_a = np.array([s[1] for s in scored[a]])
+    skipped_a = np.array([s[1] for s in skipped[a]])
+    scored_b = np.array([s[1] for s in scored[b]])
+    skipped_b = np.array([s[1] for s in skipped[b]])
+
+    # Функция для фитинга с ошибками
+    def fit_poisson(x_data, y_data, matches):
+        valid = y_data > 0
+        if sum(valid) == 0:
+            return 0.0, 0.0
+        x_fit = x_data[valid]
+        y_fit = y_data[valid]
+        sigma = np.sqrt(y_fit)
+        sigma[sigma == 0] = 1e-6
+        
+        try:
+            params, cov = curve_fit(
+                lambda x, lmbd: poisson_func(x, lmbd, matches),
+                x_fit, y_fit,
+                p0=[1.0],
+                sigma=sigma,
+                absolute_sigma=True
+            )
+            err = np.sqrt(np.diag(cov))[0]
+        except:
+            params = [np.sum(x_data * y_data) / matches]
+            err = 0.0
+        return params[0], err
+
+    # Получаем параметры с ошибками
+    lambda1, lambda1_err = fit_poisson(num, scored_a, matches_per_team[a])
+    lambda2, lambda2_err = fit_poisson(num, skipped_a, matches_per_team[a])
+    lambda3, lambda3_err = fit_poisson(num, scored_b, matches_per_team[b])
+    lambda4, lambda4_err = fit_poisson(num, skipped_b, matches_per_team[b])
+
+    # Монте-Карло симуляция
+    #np.random.seed(42)
+    lambdas = [
+        np.maximum(np.random.normal(l, l_err, n_simulations), 1e-9)
+        for l, l_err in [(lambda1, lambda1_err), (lambda2, lambda2_err),
+                        (lambda3, lambda3_err), (lambda4, lambda4_err)]
+    ]
+
+    # Расчет вероятностей
+    win1, win2, draw, total = [], [], [], []
+    
+    for i in range(n_simulations):
+        l1, l2, l3, l4 = [l[i] for l in lambdas]
+        
+        mu_a = (l1 + l4)/2
+        mu_b = (l2 + l3)/2
+        
+        goals = np.arange(11)
+        p_a = poisson.pmf(goals, mu_a)
+        p_b = poisson.pmf(goals, mu_b)
+        
+        cum_b = np.cumsum(p_b)
+        win1.append(np.sum(p_a[i] * cum_b[i-1] for i in range(1, 11)))
+        win2.append(np.sum(p_b[i] * np.sum(p_a[:i]) for i in range(1, 11)))
+        draw.append(np.sum(p_a[:11] * p_b[:11]))
+        total.append(mu_a + mu_b)
+
+    # Возвращаем результаты
+    return {
+        'P1': (float(np.mean(win1)), float(np.std(win1))),
+        'Draw': (float(np.mean(draw)), float(np.std(draw))),
+        'P2': (float(np.mean(win2)), float(np.std(win2))),
+        'Total': (float(np.mean(total)), float(np.std(total))),
+        'Lambdas': {
+            'Team1_Attack': (lambda1, lambda1_err),
+            'Team1_Defense': (lambda2, lambda2_err),
+            'Team2_Attack': (lambda3, lambda3_err),
+            'Team2_Defense': (lambda4, lambda4_err)
+        }
+    }
+
+def SuperPrime_Error(a, b, grade_1, grade_2, forma_1, forma_2, n_simulations=100000):
+    a -= 1
+    b -= 1
+
+    # Проверка валидности индексов и данных
+    if (a >= len(scored) or b >= len(skipped) or 
+        a < 0 or b < 0 or
+        len(scored[a]) == 0 or len(skipped[a]) == 0 or
+        len(scored[b]) == 0 or len(skipped[b]) == 0):
+        raise ValueError("Некорректные данные команд")
+
+    # Извлекаем данные
+    scored_a = np.array([s[1] for s in scored[a]])
+    skipped_a = np.array([s[1] for s in skipped[a]])
+    scored_b = np.array([s[1] for s in scored[b]])
+    skipped_b = np.array([s[1] for s in skipped[b]])
+
+    # Улучшенный фитинг Пуассона
+    def fit_poisson(x_data, y_data, matches):
+        valid = y_data > 0
+        if sum(valid) == 0:
+            return 0.0, 0.0
+        x_fit = x_data[valid]
+        y_fit = y_data[valid]
+        sigma = np.sqrt(y_fit)
+        sigma[sigma == 0] = 1e-6
+        
+        try:
+            params, cov = curve_fit(
+                lambda x, lmbd: poisson_func(x, lmbd, matches),
+                x_fit, y_fit,
+                p0=[1.0],
+                sigma=sigma,
+                absolute_sigma=True
+            )
+            err = np.sqrt(np.diag(cov))[0]
+        except:
+            params = [np.sum(x_data * y_data) / matches]
+            err = 0.0
+        return params[0], err
+
+    # Получаем параметры
+    lambda1, lambda1_err = fit_poisson(num, scored_a, matches_per_team[a])
+    lambda2, lambda2_err = fit_poisson(num, skipped_a, matches_per_team[a])
+    lambda3, lambda3_err = fit_poisson(num, scored_b, matches_per_team[b])
+    lambda4, lambda4_err = fit_poisson(num, skipped_b, matches_per_team[b])
+
+    # Корректировка формы (явное применение)
+    n_forma = 5
+    if forma_1 != 0:
+        if forma_1 > 0:
+            lambda1 *= (1 + forma_1/n_forma)
+            lambda1_err *= (1 + forma_1/n_forma)
+        else:
+            lambda2 *= (1 - forma_1/n_forma)
+            lambda2_err *= (1 - forma_1/n_forma)
+    
+    if forma_2 != 0:
+        if forma_2 > 0:
+            lambda3 *= (1 + forma_2/n_forma)
+            lambda3_err *= (1 + forma_2/n_forma)
+        else:
+            lambda4 *= (1 - forma_2/n_forma)
+            lambda4_err *= (1 - forma_2/n_forma)
+
+    # Монте-Карло симуляция
+    #np.random.seed(42)
+    samples = [
+        np.maximum(np.random.normal(l, l_err, n_simulations), 1e-9)
+        for l, l_err in [(lambda1, lambda1_err), (lambda2, lambda2_err),
+                        (lambda3, lambda3_err), (lambda4, lambda4_err)]
+    ]
+
+    # Расчет вероятностей
+    win1, win2, draw, total = [], [], [], []
+    for i in range(n_simulations):
+        l1, l2, l3, l4 = samples[0][i], samples[1][i], samples[2][i], samples[3][i]
+        
+        # Вычисление средних значений
+        def calc_mean(g, a, d):
+            if g == 0: return min(a, d)
+            elif g == 1: return 2*a*d/(a+d+1e-6)
+            elif g == 2: return (a*d)**0.5
+            elif g == 3: return (a+d)/2
+            elif g == 4: return ((a**2 + d**2)/2)**0.5
+            else: return max(a, d)
+        
+        mu1 = calc_mean(grade_1, l1, l4)
+        mu2 = calc_mean(grade_2, l3, l2)
+        
+        # Расчет вероятностей
+        max_goals = 11
+        g = np.arange(max_goals)
+        p1 = poisson.pmf(g, mu1)
+        p2 = poisson.pmf(g, mu2)
+        
+        
+        # Вычисление исходов
+        win1.append(np.sum([p1[i] * np.sum(p2[:i]) for i in range(1, max_goals)]))
+        win2.append(np.sum([p2[i] * np.sum(p1[:i]) for i in range(1, max_goals)]))
+        draw.append(np.sum(p1[:11] * p2[:11]))
+        total.append(mu1 + mu2)
+
+    # Возврат результатов
+    def calc_stats(arr):
+        mean = np.mean(arr)
+        std = np.std(arr)
+        return round(mean, 4), round(std, 4)
+    
+    return {
+        'Win1': calc_stats(win1),
+        'Draw': calc_stats(draw),
+        'Win2': calc_stats(win2),
+        'TotalGoals': calc_stats(total),
+        'Lambdas': [
+            (round(lambda1, 4), round(lambda1_err, 4)),
+            (round(lambda2, 4), round(lambda2_err, 4)),
+            (round(lambda3, 4), round(lambda3_err, 4)),
+            (round(lambda4, 4), round(lambda4_err, 4))
+        ]
+    }
