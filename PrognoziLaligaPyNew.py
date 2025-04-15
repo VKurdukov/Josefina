@@ -5,6 +5,8 @@ from scipy.optimize import curve_fit
 from scipy.stats import poisson
 from scipy.special import gamma
 from math import factorial
+from scipy.stats import nbinom
+import matplotlib.pyplot as plt
 
 
 # Загружаем данные из Excel (каждый лист соответствует команде)
@@ -830,3 +832,133 @@ def SuperPrime_Error(a, b, grade_1, grade_2, forma_1, forma_2, n_simulations=100
             (round(lambda4, 4), round(lambda4_err, 4))
         ]
     }
+
+def fit_nb(x, r, p, matches):
+    """PMF отрицательного биномиального, умноженная на число матчей."""
+    return matches * nbinom.pmf(x, r, p)
+
+def Coef_NB(a, b):
+    a -= 1; b -= 1
+
+    scored_a  = np.array([s[1] for s in scored[a]])
+    skipped_a = np.array([s[1] for s in skipped[a]])
+    scored_b  = np.array([s[1] for s in scored[b]])
+    skipped_b = np.array([s[1] for s in skipped[b]])
+
+    x_data = np.arange(len(scored_a))
+
+    try:
+        # 1) Забитые голы команды a
+        (r1, p1), _ = curve_fit(
+            lambda x, r, p: fit_nb(x, r, p, matches_per_team[a]),
+            x_data, scored_a,
+            p0=[2, 0.5],
+            bounds=([0,    0   ], [np.inf, 0.99]),  # p ≤ 0.99
+            method='trf',
+            max_nfev=5000
+        )
+
+        # График для scored_a
+        # plt.figure()
+        # plt.scatter(x_data, scored_a, label='scored_a')
+        # plt.plot(x_data,
+        #          [fit_nb(x, r1, p1, matches_per_team[a]) for x in x_data],
+        #          label=f'r={r1:.2f}, p={p1:.2f}')
+        # plt.xlabel('x (голы)')
+        # plt.ylabel('Частота')
+        # plt.title('Fit отрицательного биномиального к scored_a')
+        # plt.legend()
+        # plt.show()
+
+        # 2) Пропущенные голы команды a
+        (r2, p2), _ = curve_fit(
+            lambda x, r, p: fit_nb(x, r, p, matches_per_team[a]),
+            x_data, skipped_a,
+            p0=[2, 0.5],
+            bounds=([0,    0   ], [np.inf, 0.99]),
+            method='trf',
+            max_nfev=5000
+        )
+
+        # plt.figure()
+        # plt.scatter(x_data, skipped_a, label='skipped_a')
+        # plt.plot(x_data,
+        #          [fit_nb(x, r2, p2, matches_per_team[a]) for x in x_data],
+        #          label=f'r={r2:.2f}, p={p2:.2f}')
+        # plt.title('Fit отрицательного биномиального к skipped_a')
+        # plt.legend()
+        # plt.show()
+
+        # 3) Забитые голы команды b
+        (r3, p3), _ = curve_fit(
+            lambda x, r, p: fit_nb(x, r, p, matches_per_team[b]),
+            x_data, scored_b,
+            p0=[2, 0.5],
+            bounds=([0,    0   ], [np.inf, 0.99]),
+            method='trf',
+            max_nfev=5000
+        )
+
+        # plt.figure()
+        # plt.scatter(x_data, scored_b, label='scored_b')
+        # plt.plot(x_data,
+        #          [fit_nb(x, r3, p3, matches_per_team[b]) for x in x_data],
+        #          label=f'r={r3:.2f}, p={p3:.2f}')
+        # plt.title('Fit scored_b')
+        # plt.legend()
+        # plt.show()
+
+        # 4) Пропущенные голы команды b
+        (r4, p4), _ = curve_fit(
+            lambda x, r, p: fit_nb(x, r, p, matches_per_team[b]),
+            x_data, skipped_b,
+            p0=[2, 0.5],
+            bounds=([0,    0   ], [np.inf, 0.99]),
+            method='trf',
+            max_nfev=5000
+        )
+
+        # plt.figure()
+        # plt.scatter(x_data, skipped_b, label='skipped_b')
+        # plt.plot(x_data,
+        #          [fit_nb(x, r4, p4, matches_per_team[b]) for x in x_data],
+        #          label=f'r={r4:.2f}, p={p4:.2f}')
+        # plt.title('Fit skipped_b')
+        # plt.legend()
+        # plt.show()
+
+    except RuntimeError as e:
+        raise ValueError("Ошибка фитирования параметров") from e
+
+    # Функции вероятностей для полуматчей
+    def Pscore1(x):
+        total = 0
+        for i in range(21):
+            arg = 2*x - i
+            if arg >= 0:
+                total += fit_nb(arg, r1, p1, matches_per_team[a]) * \
+                         fit_nb(i,    r4, p4, matches_per_team[b])
+        return total / (matches_per_team[a] * matches_per_team[b])
+
+    def Pscore2(x):
+        total = 0
+        for i in range(21):
+            arg = 2*x - i
+            if arg >= 0:
+                total += fit_nb(arg, r2, p2, matches_per_team[a]) * \
+                         fit_nb(i,    r3, p3, matches_per_team[b])
+        return total / (matches_per_team[a] * matches_per_team[b])
+
+    # Кумулятивные функции
+    def f1(n):
+        return sum(Pscore1(i/2) for i in range(int(2*n + 1)))
+
+    def f2(n):
+        return sum(Pscore2(i/2) for i in range(int(2*n + 1)))
+
+    # Итоговые вероятности исходов
+    Win1 = sum(Pscore1(i/2) * f2(i/2 - 0.5) for i in range(1, 21))
+    Win2 = sum(Pscore2(i/2) * f1((i - 1)/2)     for i in range(1, 21))
+    draw = sum(Pscore1(i/2) * Pscore2(i/2)       for i in range(0, 21))
+
+    return [Win1, draw, Win2]
