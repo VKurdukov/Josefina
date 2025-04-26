@@ -4,13 +4,15 @@ from PrognoziLaligaPyNew import NormalPrime
 from PrognoziLaligaPyNew import Coef_Monte
 from PrognoziLaligaPyNew import SuperPrime_Error
 from PrognoziLaligaPyNew import Coef_NB
+from PrognoziLaligaPyNew import Coef_Max
 
 
-#print(SuperPrime(10,20,5,2,0,0))
-#print(SuperPrime(10,20,5,2,3,-3))
-#print(SuperPrime(10,20,5,2,3,-3))
-#print(NormalPrime(10,20,5,2,3,-3))
-print(Coef(10,20))
-#print(Coef_Monte(10,20))
-#print(SuperPrime_Error(10,20,5,2,3,-3))
-print(Coef_NB(10,20))
+# print(SuperPrime(1,20,3,3,0,0))
+# print(SuperPrime(1,20,5,2,3,-3))
+# print(SuperPrime(1,20,5,2,3,-3))
+# print(NormalPrime(1,20,3,3,-5,-5))
+# print(Coef(1,20))
+# print(Coef_Monte(1,20))
+print(SuperPrime_Error(1,20,5,2,-5,-5))
+# print(Coef_NB(1,20))
+# print(Coef_Max(1,20))

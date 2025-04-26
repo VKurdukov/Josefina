@@ -852,80 +852,80 @@ def Coef_NB(a, b):
         (r1, p1), _ = curve_fit(
             lambda x, r, p: fit_nb(x, r, p, matches_per_team[a]),
             x_data, scored_a,
-            p0=[2, 0.5],
-            bounds=([0,    0   ], [np.inf, 0.99]),  # p ≤ 0.99
-            method='trf',
+            p0=[10, 0.5],
+            bounds=([0,0], [100, 0.999999]),  # p ≤ 0.99
+            method='dogbox',
             max_nfev=5000
         )
 
         # График для scored_a
-        # plt.figure()
-        # plt.scatter(x_data, scored_a, label='scored_a')
-        # plt.plot(x_data,
-        #          [fit_nb(x, r1, p1, matches_per_team[a]) for x in x_data],
-        #          label=f'r={r1:.2f}, p={p1:.2f}')
-        # plt.xlabel('x (голы)')
-        # plt.ylabel('Частота')
-        # plt.title('Fit отрицательного биномиального к scored_a')
-        # plt.legend()
-        # plt.show()
+        plt.figure()
+        plt.scatter(x_data, scored_a, label='scored_a')
+        plt.plot(x_data,
+                 [fit_nb(x, r1, p1, matches_per_team[a]) for x in x_data],
+                 label=f'r={r1:.2f}, p={p1:.2f}')
+        plt.xlabel('x (голы)')
+        plt.ylabel('Частота')
+        plt.title('Fit отрицательного биномиального к scored_a')
+        plt.legend()
+        plt.show()
 
         # 2) Пропущенные голы команды a
         (r2, p2), _ = curve_fit(
             lambda x, r, p: fit_nb(x, r, p, matches_per_team[a]),
             x_data, skipped_a,
-            p0=[2, 0.5],
-            bounds=([0,    0   ], [np.inf, 0.99]),
-            method='trf',
+            p0=[10, 0.5],
+            bounds=([0,0], [100,0.999999]),
+            method='dogbox',
             max_nfev=5000
         )
 
-        # plt.figure()
-        # plt.scatter(x_data, skipped_a, label='skipped_a')
-        # plt.plot(x_data,
-        #          [fit_nb(x, r2, p2, matches_per_team[a]) for x in x_data],
-        #          label=f'r={r2:.2f}, p={p2:.2f}')
-        # plt.title('Fit отрицательного биномиального к skipped_a')
-        # plt.legend()
-        # plt.show()
+        plt.figure()
+        plt.scatter(x_data, skipped_a, label='skipped_a')
+        plt.plot(x_data,
+                 [fit_nb(x, r2, p2, matches_per_team[a]) for x in x_data],
+                 label=f'r={r2:.2f}, p={p2:.2f}')
+        plt.title('Fit отрицательного биномиального к skipped_a')
+        plt.legend()
+        plt.show()
 
         # 3) Забитые голы команды b
         (r3, p3), _ = curve_fit(
             lambda x, r, p: fit_nb(x, r, p, matches_per_team[b]),
             x_data, scored_b,
-            p0=[2, 0.5],
-            bounds=([0,    0   ], [np.inf, 0.99]),
-            method='trf',
+            p0=[10, 0.5],
+            bounds=([0,0], [100, 0.999999]),
+            method='dogbox',
             max_nfev=5000
         )
 
-        # plt.figure()
-        # plt.scatter(x_data, scored_b, label='scored_b')
-        # plt.plot(x_data,
-        #          [fit_nb(x, r3, p3, matches_per_team[b]) for x in x_data],
-        #          label=f'r={r3:.2f}, p={p3:.2f}')
-        # plt.title('Fit scored_b')
-        # plt.legend()
-        # plt.show()
+        plt.figure()
+        plt.scatter(x_data, scored_b, label='scored_b')
+        plt.plot(x_data,
+                 [fit_nb(x, r3, p3, matches_per_team[b]) for x in x_data],
+                 label=f'r={r3:.2f}, p={p3:.2f}')
+        plt.title('Fit scored_b')
+        plt.legend()
+        plt.show()
 
         # 4) Пропущенные голы команды b
         (r4, p4), _ = curve_fit(
             lambda x, r, p: fit_nb(x, r, p, matches_per_team[b]),
             x_data, skipped_b,
-            p0=[2, 0.5],
-            bounds=([0,    0   ], [np.inf, 0.99]),
-            method='trf',
+            p0=[10, 0.5],
+            bounds=([0,0], [100,0.999999]),
+            method='dogbox',
             max_nfev=5000
         )
 
-        # plt.figure()
-        # plt.scatter(x_data, skipped_b, label='skipped_b')
-        # plt.plot(x_data,
-        #          [fit_nb(x, r4, p4, matches_per_team[b]) for x in x_data],
-        #          label=f'r={r4:.2f}, p={p4:.2f}')
-        # plt.title('Fit skipped_b')
-        # plt.legend()
-        # plt.show()
+        plt.figure()
+        plt.scatter(x_data, skipped_b, label='skipped_b')
+        plt.plot(x_data,
+                 [fit_nb(x, r4, p4, matches_per_team[b]) for x in x_data],
+                 label=f'r={r4:.2f}, p={p4:.2f}')
+        plt.title('Fit skipped_b')
+        plt.legend()
+        plt.show()
 
     except RuntimeError as e:
         raise ValueError("Ошибка фитирования параметров") from e
@@ -962,3 +962,133 @@ def Coef_NB(a, b):
     draw = sum(Pscore1(i/2) * Pscore2(i/2)       for i in range(0, 21))
 
     return [Win1, draw, Win2]
+from math import factorial
+#Абсолютно бесполезное распределение, но возможно когда нибуль применим
+def Coef_Bivariate(a, b, lambda_biv=0.1):
+    # Приводим индексы к нулевой базе
+    a -= 1
+    b -= 1
+
+    # Проверка валидности индексов
+    if a >= len(scored) or b >= len(skipped) or a < 0 or b < 0:
+        raise ValueError(f"Индексы команд a={a+1} или b={b+1} недопустимы.")
+
+    # Извлекаем данные
+    scored_a = np.array([s[1] for s in scored[a]])
+    skipped_a = np.array([s[1] for s in skipped[a]])
+    scored_b = np.array([s[1] for s in scored[b]])
+    skipped_b = np.array([s[1] for s in skipped[b]])
+
+    # Фитирование параметров Пуассона
+    lambda1, _ = curve_fit(lambda x, l: poisson_func(x, l, matches_per_team[a]), num, scored_a, p0=[1])
+    lambda2, _ = curve_fit(lambda x, l: poisson_func(x, l, matches_per_team[a]), num, skipped_a, p0=[1])
+    lambda3, _ = curve_fit(lambda x, l: poisson_func(x, l, matches_per_team[b]), num, scored_b, p0=[1])
+    lambda4, _ = curve_fit(lambda x, l: poisson_func(x, l, matches_per_team[b]), num, skipped_b, p0=[1])
+
+    # Получаем параметры
+    lambda1 = lambda1[0]
+    lambda2 = lambda2[0]
+    lambda3 = lambda3[0]
+    lambda4 = lambda4[0]
+
+    # Рассчитываем параметры Bivariate Poisson
+    lambda1_bvp = (lambda1 + lambda4) / 2  # Атака команды A + Защита команды B
+    lambda2_bvp = (lambda2 + lambda3) / 2  # Защита команды A + Атака команды B
+
+    def bivariate_pmf(x, y):
+        """Функция вероятности для Bivariate Poisson"""
+        total = 0.0
+        min_k = min(x, y)
+        for k in range(min_k + 1):
+            term = (lambda1_bvp**(x - k) * lambda2_bvp**(y - k) * lambda_biv**k) 
+            term /= (factorial(x - k) * factorial(y - k) * factorial(k))
+            total += term
+        return total * np.exp(-(lambda1_bvp + lambda2_bvp + lambda_biv))
+
+    # Рассчитываем вероятности исходов
+    max_goals = 10
+    Win1, Draw, Win2 = 0.0, 0.0, 0.0
+    
+    for i in range(max_goals + 1):
+        for j in range(max_goals + 1):
+            prob = bivariate_pmf(i, j)
+            if i > j:
+                Win1 += prob
+            elif i < j:
+                Win2 += prob
+            else:
+                Draw += prob
+
+    # Общее количество голов
+    TotalGoals = lambda1_bvp + lambda2_bvp + lambda_biv
+
+    return Win1, Draw, Win2, TotalGoals
+
+from scipy.optimize import minimize
+from scipy.stats import poisson
+
+def zip_pmf(x, lambda_, psi):
+    """Zero-Inflated Poisson PMF"""
+    if x == 0:
+        return psi + (1 - psi) * poisson.pmf(0, lambda_)
+    else:
+        return (1 - psi) * poisson.pmf(x, lambda_)
+
+def fit_zip(data, matches):
+    """Функция для подгонки ZIP-распределения"""
+    def neg_log_likelihood(params):
+        lambda_, psi = params
+        log_lik = 0
+        for x, count in enumerate(data):
+            if count > 0:  # Игнорируем нулевые счетчики для стабильности
+                log_lik += count * np.log(zip_pmf(x, lambda_, psi) + 1e-10)
+        return -log_lik
+    
+    # Начальные параметры: lambda = среднее, psi = доля нулей
+    init_params = [np.sum(np.arange(len(data)) * data) / matches, 0.2]
+    bounds = [(0.01, None), (0, 0.99)]  # lambda > 0, 0 <= psi < 1
+    
+    result = minimize(neg_log_likelihood, init_params, bounds=bounds)
+    return result.x[0], result.x[1]  # lambda, psi
+
+def Coef_ZIP(a, b):
+    # Приводим индексы к нулевой базе
+    a -= 1
+    b -= 1
+
+    # Проверка валидности индексов
+    if a >= len(scored) or b >= len(skipped) or a < 0 or b < 0:
+        raise ValueError(f"Индексы команд a={a+1} или b={b+1} недопустимы.")
+
+    # Извлекаем данные
+    scored_a = np.array([s[1] for s in scored[a]])
+    skipped_a = np.array([s[1] for s in skipped[a]])
+    scored_b = np.array([s[1] for s in scored[b]])
+    skipped_b = np.array([s[1] for s in skipped[b]])
+
+    # Подгонка ZIP для каждой команды
+    lambda1, psi1 = fit_zip(scored_a, matches_per_team[a])
+    lambda2, psi2 = fit_zip(skipped_a, matches_per_team[a])
+    lambda3, psi3 = fit_zip(scored_b, matches_per_team[b])
+    lambda4, psi4 = fit_zip(skipped_b, matches_per_team[b])
+
+    # Вероятности голов с учетом Zero-Inflation
+    def Pscore1(x):
+        p_zip = zip_pmf(x, (lambda1 + lambda4)/2, (psi1 + psi4)/2)
+        return p_zip if not np.isnan(p_zip) else 0
+
+    def Pscore2(x):
+        p_zip = zip_pmf(x, (lambda2 + lambda3)/2, (psi2 + psi3)/2)
+        return p_zip if not np.isnan(p_zip) else 0
+
+    # Вычисление вероятностей исходов
+    Win1 = sum(Pscore1(i) * sum(Pscore2(j) for j in range(i)) for i in range(1, 11))
+    Win2 = sum(Pscore2(i) * sum(Pscore1(j) for j in range(i)) for i in range(1, 11))
+    draw = sum(Pscore1(i) * Pscore2(i) for i in range(11))
+    # Общее количество голов (без учета Zero-Inflation)
+    TotalGoals = 0.5 * ((lambda1*(1-psi1) + lambda4*(1-psi4)) + 
+                        (lambda2*(1-psi2) + lambda3*(1-psi3)))
+
+    return Win1, draw, Win2, TotalGoals, lambda1, psi1, lambda2, psi2, lambda3, psi3, lambda4, psi4
+print(Coef_ZIP(1,2))
+print(Coef(1,2))
