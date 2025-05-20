@@ -48,7 +48,7 @@ from PrognoziLaligaPyNew import *
 print(SuperPrime_Error(1, 20, 5, 2, -5, -5))
 ```
 
-## Зависимости
+## Нужные библиотеки
 
 - numpy
 - pandas
