@@ -7,6 +7,8 @@ from scipy.special import gamma
 from math import factorial
 from scipy.stats import nbinom
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
+
 
 
 # Загружаем данные из Excel (каждый лист соответствует команде)
@@ -962,7 +964,7 @@ def Coef_NB(a, b):
     draw = sum(Pscore1(i/2) * Pscore2(i/2)       for i in range(0, 21))
 
     return [Win1, draw, Win2]
-from math import factorial
+
 #Абсолютно бесполезное распределение, но возможно когда нибуль применим
 def Coef_Bivariate(a, b, lambda_biv=0.1):
     # Приводим индексы к нулевой базе
@@ -1023,10 +1025,6 @@ def Coef_Bivariate(a, b, lambda_biv=0.1):
     TotalGoals = lambda1_bvp + lambda2_bvp + lambda_biv
 
     return Win1, Draw, Win2, TotalGoals
-
-from scipy.optimize import minimize
-from scipy.stats import poisson
-
 def zip_pmf(x, lambda_, psi):
     """Zero-Inflated Poisson PMF"""
     if x == 0:
@@ -1090,5 +1088,3 @@ def Coef_ZIP(a, b):
                         (lambda2*(1-psi2) + lambda3*(1-psi3)))
 
     return Win1, draw, Win2, TotalGoals, lambda1, psi1, lambda2, psi2, lambda3, psi3, lambda4, psi4
-print(Coef_ZIP(1,2))
-print(Coef(1,2))
